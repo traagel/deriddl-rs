@@ -141,12 +141,18 @@ fn generate_schema_dump(conn: &str, version: u32) -> Result<String, BaselineErro
     let connection = connection_manager.connect(conn)?;
     let mut executor = DatabaseExecutor::new(connection);
     
-    // Try to get schema information (this is database-specific)
-    // For now, we'll create a simple placeholder - in a real implementation,
-    // this would extract DDL statements from the database
-    let schema_queries = vec![
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_migrations'",
-    ];
+    // Get database dialect (will be updated to use config later)
+    let dialect = match crate::dialects::get_dialect_with_config(None, Some(conn), None) {
+        Ok(dialect) => {
+            info!("Using dialect {} for schema introspection", dialect.name());
+            dialect
+        }
+        Err(e) => {
+            return Err(BaselineError::Connection(ConnectionError::Other(format!("Failed to get dialect: {}", e))));
+        }
+    };
+    
+    let schema_queries = dialect.schema_introspection_queries();
     
     use chrono::Utc;
     let mut schema_content = format!(
@@ -155,7 +161,7 @@ fn generate_schema_dump(conn: &str, version: u32) -> Result<String, BaselineErro
         Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
     );
     
-    for query in schema_queries {
+    for query in &schema_queries {
         match executor.query_rows(query) {
             Ok(rows) => {
                 if !rows.is_empty() {

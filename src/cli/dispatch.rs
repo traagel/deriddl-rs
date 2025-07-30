@@ -67,22 +67,6 @@ pub fn handle(cli: Cli) {
             }
         }
 
-        Commands::Init { conn } => {
-            info!("Running INIT command");
-            let final_conn = conn
-                .or(config.database.connection_string)
-                .unwrap_or_else(|| {
-                    error!("No connection string provided via --conn flag or config file");
-                    std::process::exit(1);
-                });
-
-            debug!("Connection: {}", final_conn);
-            if let Err(e) = schema_init::init_migration_table(&final_conn) {
-                error!("Init command failed: {}", e);
-                std::process::exit(1);
-            }
-        }
-
         Commands::Plan { conn, path } => {
             info!("Running PLAN command");
             let final_conn = conn
@@ -185,6 +169,26 @@ pub fn handle(cli: Cli) {
                 require_confirmation,
             ) {
                 error!("Baseline command failed: {}", e);
+                std::process::exit(1);
+            }
+        }
+
+        Commands::Init { conn } => {
+            info!("Running INIT command");
+            let final_conn = conn
+                .or(config.database.connection_string)
+                .unwrap_or_else(|| {
+                    error!("No connection string provided via --conn flag or config file");
+                    std::process::exit(1);
+                });
+
+            debug!("Connection: {}", final_conn);
+            
+            if let Err(e) = crate::tracker::schema_init::init_migration_table_with_config(
+                &final_conn, 
+                Some(&config.migrations.dialect)
+            ) {
+                error!("Init command failed: {}", e);
                 std::process::exit(1);
             }
         }

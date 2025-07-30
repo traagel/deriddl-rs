@@ -8,14 +8,15 @@ use clap::{Parser, Subcommand};
     about = "Rust-based ODBC schema migration runner"
 )]
 pub struct Cli {
-    /// Path to configuration file
     #[arg(long, global = true)]
     pub config: Option<String>,
-    
-    /// Environment (loads config/{env}.toml)
+
     #[arg(long, global = true)]
     pub env: Option<String>,
-    
+
+    #[arg(long, global = true)]
+    pub verbose: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -116,7 +117,7 @@ pub enum Commands {
         /// Output path for config file
         #[arg(long, default_value = "config.toml")]
         output: String,
-        
+
         /// Create environment-specific config
         #[arg(long)]
         env: Option<String>,
@@ -144,7 +145,11 @@ mod tests {
     fn test_apply_command_defaults() {
         let cli = Cli::try_parse_from(["deriddl_rs", "apply"]).unwrap();
         match cli.command {
-            Commands::Apply { conn, path, dry_run } => {
+            Commands::Apply {
+                conn,
+                path,
+                dry_run,
+            } => {
                 assert_eq!(conn, None);
                 assert_eq!(path, "./migrations");
                 assert!(!dry_run);
@@ -163,10 +168,15 @@ mod tests {
             "--path",
             "./custom-migrations",
             "--dry-run",
-        ]).unwrap();
-        
+        ])
+        .unwrap();
+
         match cli.command {
-            Commands::Apply { conn, path, dry_run } => {
+            Commands::Apply {
+                conn,
+                path,
+                dry_run,
+            } => {
                 assert_eq!(conn, Some("Driver={SQLite3};Database=test.db;".to_string()));
                 assert_eq!(path, "./custom-migrations");
                 assert!(dry_run);
@@ -231,8 +241,9 @@ mod tests {
             "mysql",
             "--path",
             "./sql",
-        ]).unwrap();
-        
+        ])
+        .unwrap();
+
         match cli.command {
             Commands::Health { path, dialect } => {
                 assert_eq!(path, "./sql");
@@ -263,8 +274,9 @@ mod tests {
             "custom.toml",
             "--env",
             "dev",
-        ]).unwrap();
-        
+        ])
+        .unwrap();
+
         match cli.command {
             Commands::Config { output, env } => {
                 assert_eq!(output, "custom.toml");
@@ -276,26 +288,17 @@ mod tests {
 
     #[test]
     fn test_global_config_flag() {
-        let cli = Cli::try_parse_from([
-            "deriddl_rs",
-            "--config",
-            "custom-config.toml",
-            "health",
-        ]).unwrap();
-        
+        let cli = Cli::try_parse_from(["deriddl_rs", "--config", "custom-config.toml", "health"])
+            .unwrap();
+
         assert_eq!(cli.config, Some("custom-config.toml".to_string()));
         assert!(matches!(cli.command, Commands::Health { .. }));
     }
 
     #[test]
     fn test_global_env_flag() {
-        let cli = Cli::try_parse_from([
-            "deriddl_rs",
-            "--env",
-            "production",
-            "status",
-        ]).unwrap();
-        
+        let cli = Cli::try_parse_from(["deriddl_rs", "--env", "production", "status"]).unwrap();
+
         assert_eq!(cli.env, Some("production".to_string()));
         assert!(matches!(cli.command, Commands::Status { .. }));
     }

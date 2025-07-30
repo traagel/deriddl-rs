@@ -17,6 +17,9 @@ pub enum ConnectionError {
 
     #[error("Transaction failed: {0}")]
     TransactionFailed(String),
+
+    #[error("Other error: {0}")]
+    Other(String),
 }
 
 pub struct ConnectionManager {

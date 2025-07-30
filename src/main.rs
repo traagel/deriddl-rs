@@ -1,15 +1,17 @@
 mod cli;
-mod orchestrator;
-mod model;
-mod tracker;
+mod dialects;
 mod executor;
+mod logger;
+mod model;
+mod orchestrator;
+mod tracker;
 
 use clap::Parser;
 use cli::args::Cli;
 use cli::dispatch::handle;
 
 fn main() {
-    env_logger::init();
     let cli = Cli::parse();
+    logger::setup_logger(cli.verbose);
     handle(cli);
 }

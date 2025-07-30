@@ -1,0 +1,43 @@
+[metadata]
+name = "MySQL"
+version = "1.0.0"
+aliases = ["mysql", "mariadb"]
+description = "MySQL/MariaDB database dialect support"
+min_version = "5.7"
+max_version = "8.x"
+
+[detection]
+connection_patterns = [
+    "mysql://.*",
+    ".*mysql.*",
+    ".*mariadb.*"
+]
+driver_patterns = [
+    "MySQL.*",
+    "MariaDB.*"
+]
+
+[features]
+supports_transactions = true
+supports_savepoints = true
+supports_schemas = true
+supports_sequences = false
+supports_arrays = false
+case_sensitive = false
+
+[sql]
+quote_identifier = "`"
+escape_identifier = "``"
+current_timestamp = "CURRENT_TIMESTAMP"
+boolean_true = "TRUE"
+boolean_false = "FALSE"
+
+[types]
+migration_id = "VARCHAR(255)"
+migration_type = "VARCHAR(16)"
+version = "INTEGER"
+filename = "VARCHAR(255)"
+checksum = "VARCHAR(64)"
+applied_at = "TIMESTAMP"
+execution_time_ms = "INTEGER"
+success = "BOOLEAN"

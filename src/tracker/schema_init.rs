@@ -1,72 +1,49 @@
-use crate::executor::{ConnectionManager, ConnectionError, DatabaseExecutor};
-use log::{info, debug, error};
-
-const SCHEMA_MIGRATIONS_TABLE_SQL: &str = r#"
-CREATE TABLE IF NOT EXISTS schema_migrations (
-    migration_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    migration_type VARCHAR(16) NOT NULL DEFAULT 'versioned',
-    version INTEGER,
-    filename VARCHAR(255) NOT NULL,
-    checksum VARCHAR(64) NOT NULL,
-    applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    execution_time_ms INTEGER NOT NULL,
-    success BOOLEAN NOT NULL DEFAULT TRUE
-)
-"#;
-
-const SCHEMA_MIGRATIONS_TABLE_SQL_POSTGRES: &str = r#"
-CREATE TABLE IF NOT EXISTS schema_migrations (
-    migration_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    migration_type VARCHAR(16) NOT NULL DEFAULT 'versioned',
-    version INTEGER,
-    filename VARCHAR(255) NOT NULL,
-    checksum VARCHAR(64) NOT NULL,
-    applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    execution_time_ms INTEGER NOT NULL,
-    success BOOLEAN NOT NULL DEFAULT TRUE
-)
-"#;
-
-const SCHEMA_MIGRATIONS_TABLE_SQL_MYSQL: &str = r#"
-CREATE TABLE IF NOT EXISTS schema_migrations (
-    migration_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    migration_type VARCHAR(16) NOT NULL DEFAULT 'versioned',
-    version INTEGER,
-    filename VARCHAR(255) NOT NULL,
-    checksum VARCHAR(64) NOT NULL,
-    applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    execution_time_ms INTEGER NOT NULL,
-    success BOOLEAN NOT NULL DEFAULT TRUE
-)
-"#;
-
-const SCHEMA_MIGRATIONS_TABLE_SQL_SQLITE: &str = r#"
-CREATE TABLE IF NOT EXISTS schema_migrations (
-    migration_id TEXT PRIMARY KEY NOT NULL,
-    migration_type TEXT NOT NULL DEFAULT 'versioned',
-    version INTEGER,
-    filename TEXT NOT NULL,
-    checksum TEXT NOT NULL,
-    applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    execution_time_ms INTEGER NOT NULL,
-    success BOOLEAN NOT NULL DEFAULT 1
-)
-"#;
+use crate::dialects;
+use crate::executor::{ConnectionError, ConnectionManager, DatabaseExecutor};
+use log::{debug, error, info};
 
 pub fn init_migration_table(conn_string: &str) -> Result<(), ConnectionError> {
+    init_migration_table_with_config(conn_string, None)
+}
+
+pub fn init_migration_table_with_config(
+    conn_string: &str,
+    config_dialect: Option<&str>,
+) -> Result<(), ConnectionError> {
     info!("Initializing schema_migrations table");
     debug!("Connection string length: {}", conn_string.len());
-    
+
     let connection_manager = ConnectionManager::new()?;
     let connection = connection_manager.connect(conn_string)?;
     let mut executor = DatabaseExecutor::new(connection);
-    
-    // Try to detect database type from connection string and use appropriate SQL
-    let create_table_sql = detect_database_type_and_get_sql(conn_string);
-    
-    debug!("Creating schema_migrations table");
-    executor.execute_query(create_table_sql)?;
-    
+
+    // Get dialect with config support
+    let dialect = match dialects::get_dialect_with_config(None, Some(conn_string), config_dialect) {
+        Ok(dialect) => {
+            info!(
+                "Using database dialect: {} (source: {})",
+                dialect.name(),
+                if config_dialect.is_some() {
+                    "config"
+                } else {
+                    "auto-detected"
+                }
+            );
+            dialect
+        }
+        Err(e) => {
+            error!("Failed to get dialect: {}", e);
+            return Err(ConnectionError::Other(format!("Dialect error: {}", e)));
+        }
+    };
+
+    let create_table_sql = dialect.create_migrations_table_sql();
+    debug!(
+        "Creating schema_migrations table with dialect: {}",
+        dialect.name()
+    );
+    executor.execute_query(&create_table_sql)?;
+
     // Verify table was created by querying it
     match executor.query_single_value("SELECT COUNT(*) FROM schema_migrations") {
         Ok(_) => {
@@ -82,11 +59,11 @@ pub fn init_migration_table(conn_string: &str) -> Result<(), ConnectionError> {
 
 pub fn check_migration_table_exists(conn_string: &str) -> Result<bool, ConnectionError> {
     debug!("Checking if schema_migrations table exists");
-    
+
     let connection_manager = ConnectionManager::new()?;
     let connection = connection_manager.connect(conn_string)?;
     let mut executor = DatabaseExecutor::new(connection);
-    
+
     // Try to query the table - if it fails, it probably doesn't exist
     match executor.query_single_value("SELECT COUNT(*) FROM schema_migrations") {
         Ok(_) => {
@@ -97,23 +74,5 @@ pub fn check_migration_table_exists(conn_string: &str) -> Result<bool, Connectio
             debug!("schema_migrations table does not exist");
             Ok(false)
         }
-    }
-}
-
-fn detect_database_type_and_get_sql(conn_string: &str) -> &'static str {
-    let conn_lower = conn_string.to_lowercase();
-    
-    if conn_lower.contains("postgresql") || conn_lower.contains("postgres") {
-        debug!("Detected PostgreSQL database");
-        SCHEMA_MIGRATIONS_TABLE_SQL_POSTGRES
-    } else if conn_lower.contains("mysql") || conn_lower.contains("mariadb") {
-        debug!("Detected MySQL/MariaDB database");
-        SCHEMA_MIGRATIONS_TABLE_SQL_MYSQL
-    } else if conn_lower.contains("sqlite") {
-        debug!("Detected SQLite database");
-        SCHEMA_MIGRATIONS_TABLE_SQL_SQLITE
-    } else {
-        debug!("Using generic SQL for unknown database type");
-        SCHEMA_MIGRATIONS_TABLE_SQL
     }
 }

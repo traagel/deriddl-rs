@@ -1,0 +1,42 @@
+[metadata]
+name = "SQLite"
+version = "1.0.0"
+aliases = ["sqlite", "sqlite3"]
+description = "SQLite database dialect support"
+min_version = "3.0"
+max_version = "3.x"
+
+[detection]
+connection_patterns = [
+    "sqlite://.*",
+    ".*sqlite.*"
+]
+driver_patterns = [
+    "SQLite.*",
+    "SQLite3.*"
+]
+
+[features]
+supports_transactions = true
+supports_savepoints = true
+supports_schemas = false
+supports_sequences = false
+supports_arrays = false
+case_sensitive = true
+
+[sql]
+quote_identifier = "\""
+escape_identifier = "\"\""
+current_timestamp = "CURRENT_TIMESTAMP"
+boolean_true = "1"
+boolean_false = "0"
+
+[types]
+migration_id = "TEXT"
+migration_type = "TEXT"
+version = "INTEGER"
+filename = "TEXT"
+checksum = "TEXT"
+applied_at = "DATETIME"
+execution_time_ms = "INTEGER"
+success = "BOOLEAN"

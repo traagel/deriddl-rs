@@ -1,4 +1,4 @@
-pub mod version_store;
 pub mod schema_init;
+pub mod version_store;
 
-// TODO: Add exports when structs/functions are implemented
+pub use version_store::VersionStore;

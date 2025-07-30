@@ -1,7 +1,7 @@
 use crate::cli::args::{Cli, Commands};
 use crate::orchestrator;
 use crate::tracker::schema_init;
-use crate::model::{Config, ConfigError};
+use crate::model::Config;
 use log::{info, debug, error};
 
 pub fn handle(cli: Cli) {
@@ -33,7 +33,10 @@ pub fn handle(cli: Cli) {
             debug!("Connection: {}", final_conn);
             debug!("Migrations path: {}", final_path);
             debug!("Dry run mode: {}", final_dry_run);
-            orchestrator::run_apply(&final_conn, final_path, final_dry_run);
+            if let Err(e) = orchestrator::run_apply(&final_conn, final_path, final_dry_run) {
+                error!("Apply command failed: {}", e);
+                std::process::exit(1);
+            }
         }
 
         Commands::Status { conn, path } => {
@@ -46,7 +49,10 @@ pub fn handle(cli: Cli) {
             
             debug!("Connection: {}", final_conn);
             debug!("Migrations path: {}", final_path);
-            orchestrator::run_status(&final_conn, final_path);
+            if let Err(e) = orchestrator::run_status(&final_conn, final_path) {
+                error!("Status command failed: {}", e);
+                std::process::exit(1);
+            }
         }
 
         Commands::Init { conn } => {
@@ -57,7 +63,10 @@ pub fn handle(cli: Cli) {
             });
             
             debug!("Connection: {}", final_conn);
-            schema_init::init_migration_table(&final_conn);
+            if let Err(e) = schema_init::init_migration_table(&final_conn) {
+                error!("Init command failed: {}", e);
+                std::process::exit(1);
+            }
         }
 
         Commands::Plan { conn, path } => {
@@ -70,7 +79,10 @@ pub fn handle(cli: Cli) {
             
             debug!("Connection: {}", final_conn);
             debug!("Migrations path: {}", final_path);
-            orchestrator::run_plan(&final_conn, final_path);
+            if let Err(e) = orchestrator::run_plan(&final_conn, final_path) {
+                error!("Plan command failed: {}", e);
+                std::process::exit(1);
+            }
         }
 
         Commands::Health { path, dialect } => {

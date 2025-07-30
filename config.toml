@@ -4,7 +4,7 @@ max_retries = 3
 
 [migrations]
 path = "./migrations"
-dialect = "postgres"
+dialect = "sqlite"
 validate_sql = true
 file_pattern = '^\d{4}_.*\.sql$'
 

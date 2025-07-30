@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
-use log::{debug, warn};
+use std::path::PathBuf;
+use log::debug;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -278,4 +278,317 @@ pub enum ConfigError {
     
     #[error("Failed to serialize config: {0}")]
     Serialize(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::{tempdir, NamedTempFile};
+    use std::fs;
+
+    #[test]
+    fn test_config_default_values() {
+        let config = Config::default();
+        
+        // Test database defaults
+        assert_eq!(config.database.connection_string, None);
+        assert_eq!(config.database.timeout, 30);
+        assert_eq!(config.database.max_retries, 3);
+        
+        // Test migrations defaults
+        assert_eq!(config.migrations.path, "./migrations");
+        assert_eq!(config.migrations.dialect, "postgres");
+        assert!(config.migrations.validate_sql);
+        assert_eq!(config.migrations.file_pattern, r"^\d{4}_.*\.sql$");
+        
+        // Test logging defaults
+        assert_eq!(config.logging.level, "info");
+        assert!(config.logging.colored);
+        assert_eq!(config.logging.format, "pretty");
+        
+        // Test behavior defaults
+        assert!(!config.behavior.auto_create_migrations_dir);
+        assert!(config.behavior.require_confirmation);
+        assert!(!config.behavior.default_dry_run);
+        
+        // Test validation defaults
+        assert!(config.validation.enable_sqlglot);
+        assert!(!config.validation.strict_validation);
+        assert_eq!(config.validation.max_file_size_mb, 10);
+    }
+
+    #[test]
+    fn test_config_serialization() {
+        let config = Config::default();
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        
+        // Verify key sections exist
+        assert!(toml_str.contains("[database]"));
+        assert!(toml_str.contains("[migrations]"));
+        assert!(toml_str.contains("[logging]"));
+        assert!(toml_str.contains("[behavior]"));
+        assert!(toml_str.contains("[validation]"));
+        
+        // Verify some specific values
+        assert!(toml_str.contains("timeout = 30"));
+        assert!(toml_str.contains("path = \"./migrations\""));
+        assert!(toml_str.contains("dialect = \"postgres\""));
+    }
+
+    #[test]
+    fn test_config_deserialization() {
+        let toml_content = r#"
+[database]
+timeout = 60
+max_retries = 5
+
+[migrations]
+path = "./custom-migrations"
+dialect = "mysql"
+validate_sql = false
+
+[logging]
+level = "debug"
+colored = false
+format = "json"
+
+[behavior]
+auto_create_migrations_dir = true
+require_confirmation = false
+default_dry_run = true
+
+[validation]
+enable_sqlglot = false
+strict_validation = true
+max_file_size_mb = 20
+        "#;
+        
+        let config: Config = toml::from_str(toml_content).unwrap();
+        
+        // Verify custom values were loaded
+        assert_eq!(config.database.timeout, 60);
+        assert_eq!(config.database.max_retries, 5);
+        assert_eq!(config.migrations.path, "./custom-migrations");
+        assert_eq!(config.migrations.dialect, "mysql");
+        assert!(!config.migrations.validate_sql);
+        assert_eq!(config.logging.level, "debug");
+        assert!(!config.logging.colored);
+        assert_eq!(config.logging.format, "json");
+        assert!(config.behavior.auto_create_migrations_dir);
+        assert!(!config.behavior.require_confirmation);
+        assert!(config.behavior.default_dry_run);
+        assert!(!config.validation.enable_sqlglot);
+        assert!(config.validation.strict_validation);
+        assert_eq!(config.validation.max_file_size_mb, 20);
+    }
+
+    #[test]
+    fn test_config_partial_deserialization() {
+        let toml_content = r#"
+[database]
+timeout = 45
+
+[migrations]
+dialect = "sqlite"
+        "#;
+        
+        let config: Config = toml::from_str(toml_content).unwrap();
+        
+        // Verify overridden values
+        assert_eq!(config.database.timeout, 45);
+        assert_eq!(config.migrations.dialect, "sqlite");
+        
+        // Verify defaults are still used for unspecified values
+        assert_eq!(config.database.max_retries, 3);
+        assert_eq!(config.migrations.path, "./migrations");
+        assert_eq!(config.logging.level, "info");
+    }
+
+    #[test]
+    fn test_config_load_from_file() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let config_content = r#"
+[database]
+timeout = 120
+
+[migrations]
+path = "./test-migrations"
+        "#;
+        
+        fs::write(temp_file.path(), config_content).unwrap();
+        
+        let config = Config::load_from_file(temp_file.path().to_str().unwrap()).unwrap();
+        assert_eq!(config.database.timeout, 120);
+        assert_eq!(config.migrations.path, "./test-migrations");
+    }
+
+    #[test]
+    fn test_config_load_from_nonexistent_file() {
+        let result = Config::load_from_file("/nonexistent/config.toml");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ConfigError::FileRead(_, _)));
+    }
+
+    #[test]
+    fn test_config_load_invalid_toml() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let invalid_content = "invalid toml content [[[";
+        
+        fs::write(temp_file.path(), invalid_content).unwrap();
+        
+        let result = Config::load_from_file(temp_file.path().to_str().unwrap());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ConfigError::Parse(_, _)));
+    }
+
+    #[test]
+    fn test_config_merge() {
+        let base_config = Config {
+            database: DatabaseConfig {
+                connection_string: Some("base-connection".to_string()),
+                timeout: 30,
+                max_retries: 3,
+            },
+            migrations: MigrationsConfig {
+                path: "./base-migrations".to_string(),
+                dialect: "postgres".to_string(),
+                validate_sql: true,
+                file_pattern: "base-pattern".to_string(),
+            },
+            ..Config::default()
+        };
+        
+        let override_config = Config {
+            database: DatabaseConfig {
+                connection_string: Some("override-connection".to_string()),
+                timeout: 60,
+                max_retries: 5,
+            },
+            migrations: MigrationsConfig {
+                path: "./override-migrations".to_string(),
+                dialect: "mysql".to_string(),
+                validate_sql: false,
+                file_pattern: "override-pattern".to_string(),
+            },
+            ..Config::default()
+        };
+        
+        let merged = base_config.merge(override_config);
+        
+        // Verify override values took precedence
+        assert_eq!(merged.database.connection_string, Some("override-connection".to_string()));
+        assert_eq!(merged.database.timeout, 60);
+        assert_eq!(merged.database.max_retries, 5);
+        assert_eq!(merged.migrations.path, "./override-migrations");
+        assert_eq!(merged.migrations.dialect, "mysql");
+        assert!(!merged.migrations.validate_sql);
+        assert_eq!(merged.migrations.file_pattern, "override-pattern");
+    }
+
+    #[test]
+    fn test_config_merge_none_connection_string() {
+        let base_config = Config {
+            database: DatabaseConfig {
+                connection_string: Some("base-connection".to_string()),
+                timeout: 30,
+                max_retries: 3,
+            },
+            ..Config::default()
+        };
+        
+        let override_config = Config {
+            database: DatabaseConfig {
+                connection_string: None,
+                timeout: 60,
+                max_retries: 5,
+            },
+            ..Config::default()
+        };
+        
+        let merged = base_config.merge(override_config);
+        
+        // None connection string should not override existing one
+        assert_eq!(merged.database.connection_string, Some("base-connection".to_string()));
+        assert_eq!(merged.database.timeout, 60);
+        assert_eq!(merged.database.max_retries, 5);
+    }
+
+    #[test]
+    fn test_generate_default_config() {
+        let temp_dir = tempdir().unwrap();
+        let config_path = temp_dir.path().join("generated-config.toml");
+        
+        Config::generate_default_config(config_path.to_str().unwrap()).unwrap();
+        
+        // Verify file was created
+        assert!(config_path.exists());
+        
+        // Verify we can load it back
+        let loaded_config = Config::load_from_file(config_path.to_str().unwrap()).unwrap();
+        let default_config = Config::default();
+        
+        // Verify it matches defaults (we can't use PartialEq because of the complexity)
+        assert_eq!(loaded_config.database.timeout, default_config.database.timeout);
+        assert_eq!(loaded_config.migrations.path, default_config.migrations.path);
+        assert_eq!(loaded_config.logging.level, default_config.logging.level);
+    }
+
+    #[test]
+    fn test_config_load_with_no_files() {
+        let temp_dir = tempdir().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+        
+        // Load config with no files present
+        let config = Config::load(None, None).unwrap();
+        
+        // Should get default config
+        let default_config = Config::default();
+        assert_eq!(config.database.timeout, default_config.database.timeout);
+        assert_eq!(config.migrations.path, default_config.migrations.path);
+    }
+
+    #[test]
+    fn test_config_load_with_base_config() {
+        let temp_dir = tempdir().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+        
+        let config_content = r#"
+[database]
+timeout = 90
+
+[migrations]
+dialect = "mysql"
+        "#;
+        
+        fs::write(&config_path, config_content).unwrap();
+        
+        std::env::set_current_dir(&temp_dir).unwrap();
+        let config = Config::load(None, None).unwrap();
+        
+        assert_eq!(config.database.timeout, 90);
+        assert_eq!(config.migrations.dialect, "mysql");
+        assert_eq!(config.migrations.path, "./migrations"); // default value
+    }
+
+    #[test]
+    fn test_config_error_display() {
+        let errors = vec![
+            ConfigError::FileRead("test.toml".to_string(), "Not found".to_string()),
+            ConfigError::Parse("test.toml".to_string(), "Invalid syntax".to_string()),
+            ConfigError::FileWrite("test.toml".to_string(), "Permission denied".to_string()),
+            ConfigError::Serialize("Invalid value".to_string()),
+        ];
+        
+        for error in errors {
+            let error_string = format!("{}", error);
+            assert!(!error_string.is_empty());
+            // Each error should contain relevant information
+            match error {
+                ConfigError::FileRead(path, _) => assert!(error_string.contains(&path)),
+                ConfigError::Parse(path, _) => assert!(error_string.contains(&path)),
+                ConfigError::FileWrite(path, _) => assert!(error_string.contains(&path)),
+                ConfigError::Serialize(_) => assert!(error_string.contains("serialize")),
+            }
+        }
+    }
 }

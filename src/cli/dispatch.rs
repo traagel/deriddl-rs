@@ -151,6 +151,44 @@ pub fn handle(cli: Cli) {
             }
         }
 
+        Commands::Baseline { conn, version, description, from_schema, dry_run } => {
+            info!("Running BASELINE command");
+            let final_conn = conn
+                .or(config.database.connection_string)
+                .unwrap_or_else(|| {
+                    error!("No connection string provided via --conn flag or config file");
+                    std::process::exit(1);
+                });
+            
+            // Use config defaults if not provided via CLI
+            let final_description = if description.is_empty() {
+                config.baseline.default_description.as_str()
+            } else {
+                description.as_str()
+            };
+            
+            let require_confirmation = config.baseline.require_confirmation;
+            let final_from_schema = from_schema || config.baseline.auto_generate_schema;
+
+            debug!("Connection: {}", final_conn);
+            debug!("Baseline version: {}", version);
+            debug!("Description: {}", final_description);
+            debug!("From schema: {}", final_from_schema);
+            debug!("Dry run: {}", dry_run);
+            
+            if let Err(e) = orchestrator::run_baseline(
+                &final_conn,
+                version,
+                final_description,
+                final_from_schema,
+                dry_run,
+                require_confirmation,
+            ) {
+                error!("Baseline command failed: {}", e);
+                std::process::exit(1);
+            }
+        }
+
         Commands::Config { output, env } => {
             info!("Running CONFIG command");
             debug!("Output path: {}", output);

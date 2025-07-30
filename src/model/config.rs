@@ -19,6 +19,9 @@ pub struct Config {
 
     #[serde(default)]
     pub validation: ValidationConfig,
+
+    #[serde(default)]
+    pub baseline: BaselineConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +86,28 @@ pub struct ValidationConfig {
     pub max_file_size_mb: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaselineConfig {
+    /// Default baseline version for new environments
+    pub default_version: Option<u32>,
+
+    /// Default baseline description
+    #[serde(default = "default_baseline_description")]
+    pub default_description: String,
+
+    /// Automatically generate schema dump on baseline
+    #[serde(default)]
+    pub auto_generate_schema: bool,
+
+    /// Require confirmation before creating baseline
+    #[serde(default = "default_require_baseline_confirmation")]
+    pub require_confirmation: bool,
+
+    /// Allow baseline on non-empty migration history
+    #[serde(default)]
+    pub allow_on_existing_migrations: bool,
+}
+
 // Default values
 fn default_timeout() -> u32 {
     30
@@ -119,6 +144,12 @@ fn default_enable_sqlglot() -> bool {
 }
 fn default_max_file_size_mb() -> u32 {
     10
+}
+fn default_baseline_description() -> String {
+    "Database baseline".to_string()
+}
+fn default_require_baseline_confirmation() -> bool {
+    true
 }
 
 
@@ -169,6 +200,18 @@ impl Default for ValidationConfig {
             enable_sqlglot: default_enable_sqlglot(),
             strict_validation: false,
             max_file_size_mb: default_max_file_size_mb(),
+        }
+    }
+}
+
+impl Default for BaselineConfig {
+    fn default() -> Self {
+        Self {
+            default_version: None,
+            default_description: default_baseline_description(),
+            auto_generate_schema: false,
+            require_confirmation: default_require_baseline_confirmation(),
+            allow_on_existing_migrations: false,
         }
     }
 }
@@ -327,6 +370,13 @@ mod tests {
         assert!(config.validation.enable_sqlglot);
         assert!(!config.validation.strict_validation);
         assert_eq!(config.validation.max_file_size_mb, 10);
+        
+        // Test baseline defaults
+        assert_eq!(config.baseline.default_version, None);
+        assert_eq!(config.baseline.default_description, "Database baseline");
+        assert!(!config.baseline.auto_generate_schema);
+        assert!(config.baseline.require_confirmation);
+        assert!(!config.baseline.allow_on_existing_migrations);
     }
 
     #[test]
@@ -340,6 +390,7 @@ mod tests {
         assert!(toml_str.contains("[logging]"));
         assert!(toml_str.contains("[behavior]"));
         assert!(toml_str.contains("[validation]"));
+        assert!(toml_str.contains("[baseline]"));
 
         // Verify some specific values
         assert!(toml_str.contains("timeout = 30"));

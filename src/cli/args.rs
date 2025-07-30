@@ -88,6 +88,29 @@ pub enum Commands {
         path: String,
     },
 
+    /// Create baseline for existing database
+    Baseline {
+        /// ODBC connection string
+        #[arg(long)]
+        conn: Option<String>,
+
+        /// Baseline version number
+        #[arg(long)]
+        version: u32,
+
+        /// Description of baseline state
+        #[arg(long)]
+        description: String,
+
+        /// Generate baseline from current database schema
+        #[arg(long)]
+        from_schema: bool,
+
+        /// Don't actually create baseline, just show what would be done
+        #[arg(long)]
+        dry_run: bool,
+    },
+
     /// Generate configuration file
     Config {
         /// Output path for config file

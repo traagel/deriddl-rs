@@ -44,9 +44,11 @@ pub fn run_status(conn: &str, path: &str) -> Result<(), StatusError> {
         return Ok(());
     }
 
-    // Get applied migrations
+    // Get applied migrations and baseline info
     let mut version_store = VersionStore::new(conn)?;
     let applied_migrations = version_store.get_applied_migrations()?;
+    let applied_versions = version_store.get_applied_versions()?;
+    let baseline_version = version_store.get_baseline_version()?;
     let applied_map: HashMap<String, _> =
         applied_migrations.iter().map(|m| (m.migration_id.clone(), m)).collect();
 
@@ -58,8 +60,20 @@ pub fn run_status(conn: &str, path: &str) -> Result<(), StatusError> {
     info!("Applied: {}", applied_migrations.len());
     info!("Pending: {}", migrations.len() - applied_migrations.len());
     
+    // Show baseline information
+    if let Some(baseline) = baseline_version {
+        info!("Baseline version: {} 🏁", baseline);
+        let skipped_count = migrations.iter()
+            .filter(|m| if let Some(v) = m.version { v <= baseline } else { false })
+            .count();
+        if skipped_count > 0 {
+            info!("Migrations below baseline: {} (skipped)", skipped_count);
+        }
+    } else {
+        info!("Baseline: Not set");
+    }
+    
     // Show version statistics for versioned migrations
-    let applied_versions = version_store.get_applied_versions()?;
     if !applied_versions.is_empty() {
         info!("Latest applied version: {}", applied_versions.iter().max().unwrap());
         debug!("Applied versions: {:?}", applied_versions);

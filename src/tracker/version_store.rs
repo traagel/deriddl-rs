@@ -246,11 +246,24 @@ impl VersionStore {
     ) -> Result<Vec<Migration>, ConnectionError> {
         let mut pending = Vec::new();
         
+        // Get baseline version if it exists
+        let baseline_version = self.get_baseline_version()?;
+        
         for migration in all_migrations {
             match migration.migration_type {
                 MigrationType::Versioned => {
-                    // For versioned migrations, check if already applied
+                    // For versioned migrations, check if already applied or below baseline
                     if let Some(version) = migration.version {
+                        // Skip if migration is at or below baseline
+                        if let Some(baseline) = baseline_version {
+                            if version <= baseline {
+                                debug!("Skipping migration {} - at or below baseline version {}", 
+                                    version, baseline);
+                                continue;
+                            }
+                        }
+                        
+                        // Check if not already applied
                         if !self.is_migration_applied(version)? {
                             pending.push(migration.clone());
                         }
@@ -258,6 +271,7 @@ impl VersionStore {
                 }
                 MigrationType::Repeatable => {
                     // For repeatable migrations, check if checksum changed or never run
+                    // Repeatable migrations are not affected by baseline
                     if self.should_run_repeatable(migration)? {
                         pending.push(migration.clone());
                     }
@@ -273,6 +287,124 @@ impl VersionStore {
         );
         
         Ok(pending)
+    }
+
+    /// Create a baseline record for an existing database
+    pub fn create_baseline(&mut self, version: u32, description: &str) -> Result<(), ConnectionError> {
+        debug!("Creating baseline record for version {}", version);
+
+        // Check if baseline already exists
+        if self.is_baseline_version(version)? {
+            return Err(ConnectionError::QueryFailed(
+                format!("Baseline version {} already exists", version)
+            ));
+        }
+
+        let baseline_filename = format!("baseline_{:04}_{}", version, 
+            description.replace(" ", "_").to_lowercase());
+        
+        let query = format!(
+            "INSERT INTO schema_migrations (migration_id, migration_type, version, filename, checksum, applied_at, execution_time_ms, success) 
+             VALUES ('{}', 'baseline', {}, '{}', 'baseline', datetime('now'), 0, 1)",
+            version, version, baseline_filename
+        );
+
+        let mut executor = self.get_executor()?;
+        executor.execute_query(&query)?;
+        
+        info!("✅ Baseline version {} created successfully", version);
+        Ok(())
+    }
+
+    /// Check if a version is a baseline
+    pub fn is_baseline_version(&mut self, version: u32) -> Result<bool, ConnectionError> {
+        debug!("Checking if version {} is a baseline", version);
+
+        let query = format!(
+            "SELECT COUNT(*) FROM schema_migrations WHERE migration_type = 'baseline' AND version = {}",
+            version
+        );
+
+        let mut executor = self.get_executor()?;
+        match executor.query_single_value(&query)? {
+            Some(count) => {
+                let is_baseline = count.parse::<i32>().unwrap_or(0) > 0;
+                debug!("Version {} is baseline: {}", version, is_baseline);
+                Ok(is_baseline)
+            }
+            None => Ok(false),
+        }
+    }
+
+    /// Get the baseline version if one exists
+    pub fn get_baseline_version(&mut self) -> Result<Option<u32>, ConnectionError> {
+        debug!("Getting baseline version");
+
+        let query = "SELECT version FROM schema_migrations WHERE migration_type = 'baseline' ORDER BY version DESC LIMIT 1";
+        let mut executor = self.get_executor()?;
+        
+        match executor.query_single_value(query)? {
+            Some(version_str) => {
+                let version = version_str.parse::<u32>().unwrap_or(0);
+                debug!("Found baseline version: {}", version);
+                Ok(Some(version))
+            }
+            None => {
+                debug!("No baseline version found");
+                Ok(None)
+            }
+        }
+    }
+
+    /// Get all baseline records
+    pub fn get_baselines(&mut self) -> Result<Vec<AppliedMigration>, ConnectionError> {
+        debug!("Fetching baseline records from database");
+
+        let query = r#"
+            SELECT migration_id, migration_type, version, filename, checksum, applied_at, execution_time_ms, success
+            FROM schema_migrations 
+            WHERE migration_type = 'baseline'
+            ORDER BY version ASC
+        "#;
+
+        let mut executor = self.get_executor()?;
+        let rows = executor.query_rows(query)?;
+        let mut baselines = Vec::new();
+
+        for row in rows {
+            if row.len() >= 8 {
+                let baseline = AppliedMigration {
+                    migration_id: row[0].clone(),
+                    migration_type: MigrationType::Versioned, // Baselines are treated as versioned
+                    version: Some(row[2].parse().unwrap_or(0)),
+                    filename: row[3].clone(),
+                    checksum: row[4].clone(),
+                    applied_at: parse_timestamp(&row[5]),
+                    execution_time_ms: row[6].parse().unwrap_or(0),
+                    success: parse_boolean(&row[7]),
+                };
+                baselines.push(baseline);
+            }
+        }
+
+        debug!("Found {} baseline records", baselines.len());
+        Ok(baselines)
+    }
+
+    /// Check if a migration should be skipped due to baseline
+    pub fn should_skip_due_to_baseline(&mut self, migration_version: u32) -> Result<bool, ConnectionError> {
+        match self.get_baseline_version()? {
+            Some(baseline_version) => {
+                let should_skip = migration_version <= baseline_version;
+                debug!("Migration version {} vs baseline {}: skip = {}", 
+                    migration_version, baseline_version, should_skip);
+                Ok(should_skip)
+            }
+            None => {
+                debug!("No baseline found, migration {} should not be skipped", migration_version);
+                Ok(false)
+            }
+        }
     }
 }
 

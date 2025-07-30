@@ -30,8 +30,8 @@ Most enterprise data platforms (e.g. Databricks, Snowflake, Synapse) expose **OD
 | Filename, checksum, execution time | ✅ Logged | ✅ Logged | ✅ Logged |
 | Idempotent execution | ✅ Via history tracking | ✅ Enforced via history | ✅ Enforced via history |
 | **Migration Types** |
-| Repeatable migrations | ⚠️ Planned | ✅ R__*.sql | ✅ `runAlways="true"` |
-| Baseline support | ⚠️ Planned | ✅ Baseline version | ✅ Baseline capability |
+| Repeatable migrations | ✅ R__*.sql | ✅ R__*.sql | ✅ `runAlways="true"` |
+| Baseline support | ✅ `baseline` command | ✅ Baseline version | ✅ Baseline capability |
 | Undo migrations | ❌ Not planned | ✅ U__*.sql (Teams) | ✅ Rollback (Pro) |
 | **Validation & Safety** |
 | Checksum drift validation | ✅ Present | ✅ Present | ✅ Enhanced v9 checksums |
@@ -75,7 +75,10 @@ Most enterprise data platforms (e.g. Databricks, Snowflake, Synapse) expose **OD
 
 - ✅ ODBC-based execution via [`odbc-api`](https://crates.io/crates/odbc-api)
 - ✅ Versioned `.sql` file migrations
+- ✅ Repeatable migrations (`R__*.sql`)
 - ✅ `schema_migrations` tracking table
+- ✅ **Baseline support** for existing databases
+- ✅ **Migration validation** and integrity checking
 - ✅ Dry-run mode for CI/CD verification
 - ✅ **TOML configuration system** with environment support
 - ✅ **SQLGlot integration** for SQL validation
@@ -127,6 +130,12 @@ default_dry_run = false
 enable_sqlglot = true          # Requires: pip install sqlglot
 strict_validation = false      # Fail on warnings, not just errors
 max_file_size_mb = 10
+
+[baseline]
+default_description = "Database baseline"
+auto_generate_schema = false   # Generate schema dump on baseline
+require_confirmation = true    # Require confirmation before baseline
+allow_on_existing_migrations = false
 ```
 
 ### Environment-Specific Configuration
@@ -183,15 +192,66 @@ cargo run -- --env prod --conn "Driver=..." apply
 
 ```text
 migrations/
-├── 0001_init_schema.sql
-├── 0002_add_users_table.sql
-└── 0003_add_index.sql
+├── 0001_init_schema.sql          # Versioned migration
+├── 0002_add_users_table.sql      # Versioned migration  
+├── 0003_add_index.sql            # Versioned migration
+├── R__create_views.sql           # Repeatable migration
+└── R__refresh_statistics.sql     # Repeatable migration
 ```
 
+### Versioned Migrations
 Files must follow the `{version}_{description}.sql` pattern where:
 - **Version**: 4-digit zero-padded number (0001, 0002, etc.)
 - **Description**: Snake_case description
 - **Extension**: `.sql`
+
+### Repeatable Migrations  
+Files must follow the `R__{description}.sql` pattern where:
+- **Prefix**: `R__` (capital R, double underscore)
+- **Description**: Snake_case description
+- **Extension**: `.sql`
+- **Behavior**: Re-run when file content (checksum) changes
+
+---
+
+## 🏁 Baseline Support
+
+**Baseline support** allows you to start using deriDDL on existing databases without having to create migration files for all existing schema objects.
+
+### When to Use Baseline
+
+- **Legacy Database Migration**: You have an existing production database and want to start using deriDDL
+- **Environment Promotion**: Development uses migrations, but production was created from backups  
+- **Schema Inheritance**: Multiple databases with similar existing schema need consistent migration starting points
+
+### How Baseline Works
+
+1. **Set Baseline**: Tell deriDDL that your database is already at version X
+2. **Skip Historical Migrations**: Any migration ≤ baseline version is automatically skipped
+3. **Apply Future Migrations**: Only migrations > baseline version are applied
+
+### Usage Examples
+
+```bash
+# Create baseline at version 100 (dry-run first)
+cargo run -- baseline --conn "DSN=prod_db;" --version 100 --description "Production v2.1 state" --dry-run
+
+# Create baseline and generate schema dump
+cargo run -- baseline --conn "DSN=prod_db;" --version 100 --description "Production v2.1 state" --from-schema
+
+# Using configuration defaults
+cargo run -- --env prod baseline --version 100 --description "Prod baseline"
+```
+
+### Configuration
+
+```toml
+[baseline]
+default_description = "Database baseline"  # Default description
+auto_generate_schema = false              # Auto-generate schema dump  
+require_confirmation = true               # Require confirmation
+allow_on_existing_migrations = false      # Allow baseline with existing migrations
+```
 
 ---
 
@@ -242,12 +302,35 @@ cargo run -- status --conn "..." --path ./migrations
 # Preview pending migrations
 cargo run -- plan --conn "..." --path ./migrations
 
+# Validate migration integrity
+cargo run -- validate --conn "..." --path ./migrations
+
+# Create baseline for existing database
+cargo run -- baseline --conn "..." --version 100 --description "Production v2.1 state" --dry-run
+cargo run -- baseline --conn "..." --version 100 --description "Production v2.1 state" --from-schema
+
 # Apply migrations (dry-run)
 cargo run -- apply --conn "..." --path ./migrations --dry-run
 
 # Apply migrations (live)
 cargo run -- apply --conn "..." --path ./migrations
 ```
+
+### Migration Validation
+```bash
+# Validate migration integrity and checksums
+cargo run -- validate --conn "..." --path ./migrations
+
+# Validate with specific environment
+cargo run -- --env prod validate
+```
+
+**Validation checks include:**
+- ✅ Checksum integrity (detect modified applied migrations)
+- ✅ Orphaned database migrations (migrations in DB but not in files)
+- ✅ Migration sequence consistency
+- ✅ File accessibility and permissions
+- ✅ Database connectivity
 
 ### Global Flags
 All commands support these global configuration flags:

@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS test_table_4 (id INT PRIMARY KEY, data TEXT);

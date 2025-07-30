@@ -239,10 +239,88 @@ src/
 
 ## 📄 License
 
-[Add your license here]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 ## 🤝 Contributing
 
-[Add contribution guidelines here]
+We welcome contributions! Please follow these guidelines:
+
+### 🐛 Reporting Issues
+- Use the GitHub issue tracker
+- Include system information (OS, Rust version, database type)
+- Provide minimal reproduction steps
+- Include relevant logs with `RUST_LOG=debug`
+
+### 🔧 Development Setup
+```bash
+# Fork and clone the repository
+git clone https://github.com/yourusername/deriDDL.git
+cd deriDDL
+
+# Install dependencies
+cargo check
+
+# Set up pre-commit validation (optional)
+python -m venv venv
+source venv/bin/activate
+pip install sqlglot
+
+# Run tests and health checks
+cargo test
+cargo run -- health
+```
+
+### 📝 Pull Request Process
+
+1. **Fork** the repository and create a feature branch
+2. **Write tests** for new functionality
+3. **Run the full test suite**: `cargo test && cargo clippy && cargo fmt`
+4. **Update documentation** if needed
+5. **Create a clear PR description** explaining the changes
+6. **Ensure CI passes** before requesting review
+
+### 🏗️ Code Style
+- Follow `cargo fmt` formatting
+- Pass `cargo clippy` without warnings
+- Use meaningful commit messages
+- Add documentation for public APIs
+- Include examples for new features
+
+### 🧪 Testing
+```bash
+# Run unit tests
+cargo test
+
+# Run integration tests (requires database)
+cargo test --features integration
+
+# Test configuration system
+cargo run -- config --env test
+cargo run -- --env test health
+```
+
+### 💡 Feature Requests
+- Open an issue with the `enhancement` label
+- Describe the use case and expected behavior
+- Consider implementation complexity and maintenance burden
+- Discuss design before starting large features
+
+### 🔒 Security
+- Report security vulnerabilities privately via GitHub Security tab
+- Do not commit secrets, API keys, or connection strings
+- Follow secure coding practices for database operations
+
+### 📋 Code of Conduct
+- Be respectful and inclusive
+- Focus on constructive feedback
+- Help newcomers get started
+- Maintain a professional tone in all interactions
+
+---
+
+## 🙏 Acknowledgments
+- [SQLGlot](https://github.com/tobymao/sqlglot) for SQL parsing and validation
+- [Clap](https://github.com/clap-rs/clap) for CLI argument parsing
+- The Rust community for excellent crates and tooling

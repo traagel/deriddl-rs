@@ -36,5 +36,5 @@ fn test_missing_subcommand() {
     deri_ddl_cmd()
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Usage: deriDDL")); // updated match
+        .stderr(predicate::str::contains("Usage: deriddl_rs")); // updated match
 }

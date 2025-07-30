@@ -1,10 +1,10 @@
 [package]
-name = "deriDDL"
+name = "deriddl-rs"  
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
 description = "Fast, deterministic ODBC schema migration tool built in Rust"
-repository = "https://github.com/yourusername/deriDDL"
+repository = "https://github.com/traagel/deriddl-rs"  
 keywords = ["database", "migration", "odbc", "sql", "schema"]
 categories = ["database", "command-line-utilities"]
 
@@ -18,8 +18,22 @@ thiserror = "1.0"
 odbc-api = "14.2"
 chrono = { version = "0.4", features = ["serde"] }
 
+[features]
+default = []
+integration = []
+
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.0"
 tempfile = "3.8"
 serial_test = "3.0"
+deriddl-rs = { path = ".", features = ["integration"] }  
+
+[lib]
+name = "deriddl_rs"  
+path = "src/lib.rs"
+
+[[bin]]
+name = "deriddl_rs"
+path = "src/main.rs"
+

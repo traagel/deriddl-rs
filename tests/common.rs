@@ -2,9 +2,9 @@ use assert_cmd::Command;
 use std::fs;
 use tempfile::{tempdir, TempDir};
 
-/// Returns a configured Command for `deriDDL`
+/// Returns a configured Command for `deriddl_rs`
 pub fn deri_ddl_cmd() -> Command {
-    Command::cargo_bin("deriDDL").expect("Binary not found")
+    Command::cargo_bin("deriddl_rs").expect("Binary not found")
 }
 
 /// Prepares a temp dir with valid migration files

@@ -96,19 +96,19 @@ mod tests {
 
     #[test]
     fn test_cli_help() {
-        let result = Cli::try_parse_from(["deriDDL", "--help"]);
+        let result = Cli::try_parse_from(["deriddl_rs", "--help"]);
         assert!(result.is_err()); // Help exits with error
     }
 
     #[test]
     fn test_cli_version() {
-        let result = Cli::try_parse_from(["deriDDL", "--version"]);
+        let result = Cli::try_parse_from(["deriddl_rs", "--version"]);
         assert!(result.is_err()); // Version exits with error
     }
 
     #[test]
     fn test_apply_command_defaults() {
-        let cli = Cli::try_parse_from(["deriDDL", "apply"]).unwrap();
+        let cli = Cli::try_parse_from(["deriddl_rs", "apply"]).unwrap();
         match cli.command {
             Commands::Apply { conn, path, dry_run } => {
                 assert_eq!(conn, None);
@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn test_apply_command_with_flags() {
         let cli = Cli::try_parse_from([
-            "deriDDL",
+            "deriddl_rs",
             "apply",
             "--conn",
             "Driver={SQLite3};Database=test.db;",
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_status_command_defaults() {
-        let cli = Cli::try_parse_from(["deriDDL", "status"]).unwrap();
+        let cli = Cli::try_parse_from(["deriddl_rs", "status"]).unwrap();
         match cli.command {
             Commands::Status { conn, path } => {
                 assert_eq!(conn, None);
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_init_command() {
-        let cli = Cli::try_parse_from(["deriDDL", "init"]).unwrap();
+        let cli = Cli::try_parse_from(["deriddl_rs", "init"]).unwrap();
         match cli.command {
             Commands::Init { conn } => {
                 assert_eq!(conn, None);
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_plan_command() {
-        let cli = Cli::try_parse_from(["deriDDL", "plan", "--conn", "test"]).unwrap();
+        let cli = Cli::try_parse_from(["deriddl_rs", "plan", "--conn", "test"]).unwrap();
         match cli.command {
             Commands::Plan { conn, path } => {
                 assert_eq!(conn, Some("test".to_string()));
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn test_health_command_defaults() {
-        let cli = Cli::try_parse_from(["deriDDL", "health"]).unwrap();
+        let cli = Cli::try_parse_from(["deriddl_rs", "health"]).unwrap();
         match cli.command {
             Commands::Health { path, dialect } => {
                 assert_eq!(path, "./migrations");
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn test_health_command_custom_dialect() {
         let cli = Cli::try_parse_from([
-            "deriDDL",
+            "deriddl_rs",
             "health",
             "--dialect",
             "mysql",
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_config_command_defaults() {
-        let cli = Cli::try_parse_from(["deriDDL", "config"]).unwrap();
+        let cli = Cli::try_parse_from(["deriddl_rs", "config"]).unwrap();
         match cli.command {
             Commands::Config { output, env } => {
                 assert_eq!(output, "config.toml");
@@ -223,7 +223,7 @@ mod tests {
     #[test]
     fn test_config_command_with_env() {
         let cli = Cli::try_parse_from([
-            "deriDDL",
+            "deriddl_rs",
             "config",
             "--output",
             "custom.toml",
@@ -243,7 +243,7 @@ mod tests {
     #[test]
     fn test_global_config_flag() {
         let cli = Cli::try_parse_from([
-            "deriDDL",
+            "deriddl_rs",
             "--config",
             "custom-config.toml",
             "health",
@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn test_global_env_flag() {
         let cli = Cli::try_parse_from([
-            "deriDDL",
+            "deriddl_rs",
             "--env",
             "production",
             "status",
@@ -268,13 +268,13 @@ mod tests {
 
     #[test]
     fn test_invalid_command() {
-        let result = Cli::try_parse_from(["deriDDL", "invalid-command"]);
+        let result = Cli::try_parse_from(["deriddl_rs", "invalid-command"]);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_missing_required_subcommand() {
-        let result = Cli::try_parse_from(["deriDDL"]);
+        let result = Cli::try_parse_from(["deriddl_rs"]);
         assert!(result.is_err());
     }
 }

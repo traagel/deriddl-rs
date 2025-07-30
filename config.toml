@@ -1,0 +1,24 @@
+[database]
+timeout = 30
+max_retries = 3
+
+[migrations]
+path = "./migrations"
+dialect = "postgres"
+validate_sql = true
+file_pattern = '^\d{4}_.*\.sql$'
+
+[logging]
+level = "info"
+colored = true
+format = "pretty"
+
+[behavior]
+auto_create_migrations_dir = false
+require_confirmation = true
+default_dry_run = false
+
+[validation]
+enable_sqlglot = true
+strict_validation = false
+max_file_size_mb = 10

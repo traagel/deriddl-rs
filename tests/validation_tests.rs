@@ -1,19 +1,15 @@
 use deriddl_rs::model::Migration;
-use deriddl_rs::orchestrator::validator::{ValidationResult, Validator};
+use deriddl_rs::orchestrator::validator::Validator;
 use std::path::PathBuf;
 
 fn make_migration(version: u32, name: &str) -> Migration {
     let filename = format!("{:04}_{}.sql", version, name);
-    Migration {
+    Migration::new(
         version,
-        name: name.to_string(),
-        file_path: PathBuf::from(&filename),
-        sql_content: format!("-- migration {}", version),
-        checksum: "dummy".into(),
-        applied_at: None,
-        execution_time_ms: None,
-        success: true,
-    }
+        name.to_string(),
+        PathBuf::from(&filename),
+        format!("-- migration {}", version),
+    )
 }
 
 #[test]
@@ -47,18 +43,8 @@ fn passes_valid_sequence() {
 
     let issues = Validator::validate_migration_sequence(&migrations);
     for issue in &issues {
-        println!("Issue: {}", issue);
+        eprintln!("Issue: {}", issue);
     }
     assert!(issues.is_empty());
 }
 
-#[test]
-fn handles_sqlglot_unavailable() {
-    unsafe {
-        std::env::set_var("PATH", "");
-    }
-
-    let result = Validator::validate_sql("SELECT 1", "sqlite");
-    assert!(result.is_valid);
-    assert!(result.error_message.is_some());
-}

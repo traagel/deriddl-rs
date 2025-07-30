@@ -17,6 +17,60 @@ Most enterprise data platforms (e.g. Databricks, Snowflake, Synapse) expose **OD
 
 ---
 
+## 📊 Feature Comparison
+
+<details>
+<summary><strong>🆚 deriDDL vs Flyway vs Liquibase (2025)</strong></summary>
+
+| Feature | deriDDL | Flyway | Liquibase |
+|---------|---------|---------|-----------|
+| **Core Features** |
+| Versioned migrations (`V###.sql`) | ✅ Native SQL | ✅ V__*.sql | ✅ ChangeSets |
+| Migration history table | ✅ `schema_migrations` | ✅ `flyway_schema_history` | ✅ `DATABASECHANGELOG` |
+| Filename, checksum, execution time | ✅ Logged | ✅ Logged | ✅ Logged |
+| Idempotent execution | ✅ Via history tracking | ✅ Enforced via history | ✅ Enforced via history |
+| **Migration Types** |
+| Repeatable migrations | ⚠️ Planned | ✅ R__*.sql | ✅ `runAlways="true"` |
+| Baseline support | ⚠️ Planned | ✅ Baseline version | ✅ Baseline capability |
+| Undo migrations | ❌ Not planned | ✅ U__*.sql (Teams) | ✅ Rollback (Pro) |
+| **Validation & Safety** |
+| Checksum drift validation | ✅ Present | ✅ Present | ✅ Enhanced v9 checksums |
+| Dry-run execution | ✅ `--dry-run` flag | ✅ `-dryRunOutput` | ✅ `update-sql` command |
+| SQL validation | ✅ SQLGlot integration | ⚠️ Basic syntax | ⚠️ Basic syntax |
+| Migration assertion validation | ✅ Custom logic support | ❌ Not supported | ✅ Preconditions |
+| **Advanced Features** |
+| Callback hooks (lifecycle events) | ⚠️ Planned | ✅ Lifecycle callbacks | ✅ Flow conditionals |
+| Schema state tracking | ⚠️ Planned | ❌ Limited | ✅ Comprehensive |
+| Target schema support | ⚠️ Planned | ✅ Multi-schema aware | ✅ Multi-schema aware |
+| Migration labels/groups | ⚠️ Planned | ✅ Teams feature | ✅ Labels & contexts |
+| Out-of-order migration control | ⚠️ Planned | ✅ Optional | ✅ Optional |
+| **Technology & Deployment** |
+| Runtime dependencies | ✅ Zero (static binary) | ❌ JVM required | ❌ JVM required |
+| Configuration format | ✅ TOML | ✅ Properties/TOML | ✅ Properties/YAML |
+| Database support | ⚠️ ODBC-compatible | ✅ 20+ databases | ✅ 30+ databases |
+| **Licensing & Cost** |
+| Open source core | ✅ MIT licensed | ✅ Apache 2.0 | ✅ Apache 2.0 |
+| Enterprise features | ✅ All features free | ❌ Teams subscription | ❌ Pro subscription |
+| Per-connection licensing | ✅ No restrictions | ⚠️ Teams pricing | ⚠️ Pro pricing |
+
+### **Key Differentiators**
+
+**✨ deriDDL Advantages:**
+- **Zero Runtime Dependencies**: Single static binary, no JVM overhead
+- **ODBC-First Design**: Built specifically for ODBC-only databases
+- **Cost-Effective**: All features free, no per-connection licensing
+- **Advanced SQL Validation**: SQLGlot integration for comprehensive validation
+- **Rust Performance**: Memory-safe, fast execution
+
+**⚖️ Trade-offs:**
+- **Smaller Ecosystem**: Newer tool with growing community
+- **Database Coverage**: ODBC-compatible databases only
+- **Enterprise Features**: Some advanced features still in development
+
+</details>
+
+---
+
 ## 🚀 Features
 
 - ✅ ODBC-based execution via [`odbc-api`](https://crates.io/crates/odbc-api)

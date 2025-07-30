@@ -31,6 +31,12 @@ pub fn run_apply(conn: &str, path: &str, dry_run: bool) -> Result<(), ApplyError
         return Err(ApplyError::ValidationFailed(validation_issues));
     }
     
+    // Test connection first
+    let connection_manager = ConnectionManager::new()?;
+    connection_manager.test_connection(conn)
+        .map_err(ApplyError::Connection)?;
+    info!("✅ Database connection verified");
+    
     // Ensure schema_migrations table exists
     if !schema_init::check_migration_table_exists(conn)? {
         info!("schema_migrations table does not exist, creating it");
@@ -60,7 +66,7 @@ fn run_dry_run(pending_migrations: &[crate::model::Migration]) -> Result<(), App
     info!("🔍 DRY RUN: Would apply {} migrations", pending_migrations.len());
     
     for migration in pending_migrations {
-        println!("  📄 {} - {}", migration.filename(), migration.sql_content.lines().count());
+        info!("  📄 {} - {}", migration.filename(), migration.sql_content.lines().count());
         debug!("Migration SQL preview: {}", 
             migration.sql_content.chars().take(100).collect::<String>());
     }

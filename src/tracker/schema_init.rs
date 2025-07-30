@@ -3,7 +3,9 @@ use log::{info, debug, error};
 
 const SCHEMA_MIGRATIONS_TABLE_SQL: &str = r#"
 CREATE TABLE IF NOT EXISTS schema_migrations (
-    version INTEGER PRIMARY KEY NOT NULL,
+    migration_id VARCHAR(255) PRIMARY KEY NOT NULL,
+    migration_type VARCHAR(16) NOT NULL DEFAULT 'versioned',
+    version INTEGER,
     filename VARCHAR(255) NOT NULL,
     checksum VARCHAR(64) NOT NULL,
     applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -14,7 +16,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 const SCHEMA_MIGRATIONS_TABLE_SQL_POSTGRES: &str = r#"
 CREATE TABLE IF NOT EXISTS schema_migrations (
-    version INTEGER PRIMARY KEY NOT NULL,
+    migration_id VARCHAR(255) PRIMARY KEY NOT NULL,
+    migration_type VARCHAR(16) NOT NULL DEFAULT 'versioned',
+    version INTEGER,
     filename VARCHAR(255) NOT NULL,
     checksum VARCHAR(64) NOT NULL,
     applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -25,7 +29,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 const SCHEMA_MIGRATIONS_TABLE_SQL_MYSQL: &str = r#"
 CREATE TABLE IF NOT EXISTS schema_migrations (
-    version INTEGER PRIMARY KEY NOT NULL,
+    migration_id VARCHAR(255) PRIMARY KEY NOT NULL,
+    migration_type VARCHAR(16) NOT NULL DEFAULT 'versioned',
+    version INTEGER,
     filename VARCHAR(255) NOT NULL,
     checksum VARCHAR(64) NOT NULL,
     applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -36,7 +42,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 const SCHEMA_MIGRATIONS_TABLE_SQL_SQLITE: &str = r#"
 CREATE TABLE IF NOT EXISTS schema_migrations (
-    version INTEGER PRIMARY KEY NOT NULL,
+    migration_id TEXT PRIMARY KEY NOT NULL,
+    migration_type TEXT NOT NULL DEFAULT 'versioned',
+    version INTEGER,
     filename TEXT NOT NULL,
     checksum TEXT NOT NULL,
     applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

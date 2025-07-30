@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
     pub database: DatabaseConfig,
@@ -121,17 +121,6 @@ fn default_max_file_size_mb() -> u32 {
     10
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            database: DatabaseConfig::default(),
-            migrations: MigrationsConfig::default(),
-            logging: LoggingConfig::default(),
-            behavior: BehaviorConfig::default(),
-            validation: ValidationConfig::default(),
-        }
-    }
-}
 
 impl Default for DatabaseConfig {
     fn default() -> Self {

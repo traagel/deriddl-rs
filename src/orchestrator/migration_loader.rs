@@ -26,16 +26,32 @@ impl MigrationLoader {
             if let Some(extension) = file_path.extension() {
                 if extension == "sql" {
                     if let Some(migration) = Self::parse_migration_file(&file_path)? {
-                        debug!("Loaded migration: {} (version {})", migration.name, migration.version);
+                        debug!("Loaded migration: {} (version {:?})", migration.name, migration.version);
                         migrations.push(migration);
                     }
                 }
             }
         }
 
-        // Sort by version number
-        migrations.sort_by_key(|m| m.version);
-        info!("Loaded {} migrations", migrations.len());
+        // Sort migrations: versioned first (by version), then repeatable (by name)
+        migrations.sort_by(|a, b| {
+            use crate::model::MigrationType;
+            match (&a.migration_type, &b.migration_type) {
+                (MigrationType::Versioned, MigrationType::Versioned) => {
+                    a.version.cmp(&b.version)
+                }
+                (MigrationType::Repeatable, MigrationType::Repeatable) => {
+                    a.name.cmp(&b.name)
+                }
+                (MigrationType::Versioned, MigrationType::Repeatable) => std::cmp::Ordering::Less,
+                (MigrationType::Repeatable, MigrationType::Versioned) => std::cmp::Ordering::Greater,
+            }
+        });
+        
+        let versioned_count = migrations.iter().filter(|m| !m.is_repeatable()).count();
+        let repeatable_count = migrations.iter().filter(|m| m.is_repeatable()).count();
+        info!("Loaded {} migrations ({} versioned, {} repeatable)", 
+              migrations.len(), versioned_count, repeatable_count);
         
         Ok(migrations)
     }
@@ -45,12 +61,30 @@ impl MigrationLoader {
             .and_then(|name| name.to_str())
             .unwrap_or("");
 
-        // Parse filename like "0001_init_schema.sql"
+        let sql_content = fs::read_to_string(file_path)?;
+
+        // Check for repeatable migration pattern: "R__description.sql"
+        if filename.starts_with("R__") && filename.ends_with(".sql") {
+            let name = filename
+                .strip_prefix("R__")
+                .and_then(|s| s.strip_suffix(".sql"))
+                .unwrap_or("unknown")
+                .to_string();
+            
+            debug!("Found repeatable migration: {}", filename);
+            return Ok(Some(Migration::new_repeatable(
+                name,
+                file_path.clone(),
+                sql_content,
+            )));
+        }
+
+        // Parse versioned migration filename like "0001_init_schema.sql"
         if let Some((version_str, name_part)) = filename.split_once('_') {
             if let Ok(version) = version_str.parse::<u32>() {
                 let name = name_part.strip_suffix(".sql").unwrap_or(name_part).to_string();
-                let sql_content = fs::read_to_string(file_path)?;
                 
+                debug!("Found versioned migration: {} (version {})", filename, version);
                 return Ok(Some(Migration::new(
                     version,
                     name,
@@ -60,7 +94,7 @@ impl MigrationLoader {
             }
         }
 
-        warn!("Skipping file with invalid name format: {}", filename);
+        warn!("Skipping file with invalid name format: {} (expected 'NNNN_name.sql' or 'R__name.sql')", filename);
         Ok(None)
     }
 }

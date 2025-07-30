@@ -77,6 +77,17 @@ pub enum Commands {
         dialect: String,
     },
 
+    /// Validate migration integrity and checksums
+    Validate {
+        /// ODBC connection string
+        #[arg(long)]
+        conn: Option<String>,
+
+        /// Path to .sql migration files
+        #[arg(long, default_value = "./migrations")]
+        path: String,
+    },
+
     /// Generate configuration file
     Config {
         /// Output path for config file

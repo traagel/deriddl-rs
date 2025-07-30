@@ -1,7 +1,7 @@
 use crate::executor::ConnectionError;
 use crate::orchestrator::MigrationLoader;
 use crate::tracker::{schema_init, VersionStore};
-use log::{debug, info};
+use log::{debug, info, warn};
 
 pub fn run_plan(conn: &str, path: &str) -> Result<(), PlanError> {
     info!("Running migration plan");
@@ -13,21 +13,26 @@ pub fn run_plan(conn: &str, path: &str) -> Result<(), PlanError> {
         MigrationLoader::load_migrations(path).map_err(|e| PlanError::LoadFailed(e.to_string()))?;
 
     if migrations.is_empty() {
-        println!("📋 No migrations found in {}", path);
+        info!("📋 No migrations found in {}", path);
         return Ok(());
     }
 
+    // Test connection first
+    let connection_manager = crate::executor::ConnectionManager::new()?;
+    connection_manager.test_connection(conn)?;
+    debug!("Database connection verified");
+    
     // Check if schema_migrations table exists
     let table_exists = schema_init::check_migration_table_exists(conn)?;
 
     if !table_exists {
-        println!("📋 Migration Plan");
-        println!("================");
-        println!("⚠️  schema_migrations table does not exist. All migrations will be applied.");
-        println!();
-        println!("Migrations to apply ({}):", migrations.len());
+        info!("📋 Migration Plan");
+        info!("================");
+        warn!("⚠️  schema_migrations table does not exist. All migrations will be applied.");
+        info!("");
+        info!("Migrations to apply ({}):", migrations.len());
         for (i, migration) in migrations.iter().enumerate() {
-            println!(
+            info!(
                 "{}. 📄 {} ({} lines)",
                 i + 1,
                 migration.filename(),
@@ -41,41 +46,45 @@ pub fn run_plan(conn: &str, path: &str) -> Result<(), PlanError> {
     let mut version_store = VersionStore::new(conn)?;
     let pending_migrations = version_store.get_pending_migrations(&migrations)?;
 
-    println!("📋 Migration Plan");
-    println!("================");
+    info!("📋 Migration Plan");
+    info!("================");
 
     if pending_migrations.is_empty() {
-        println!("✅ No pending migrations to apply. Database is up to date!");
+        info!("✅ No pending migrations to apply. Database is up to date!");
         return Ok(());
     }
 
-    println!("Pending migrations ({}):", pending_migrations.len());
-    println!();
+    info!("Pending migrations ({}):", pending_migrations.len());
+    info!("");
 
     for (i, migration) in pending_migrations.iter().enumerate() {
-        println!("{}. 📄 {}", i + 1, migration.filename());
-        println!("   Version: {}", migration.version);
-        println!("   Lines: {}", migration.sql_content.lines().count());
-        println!("   Checksum: {}...", &migration.checksum[..8]);
+        info!("{}. 📄 {}", i + 1, migration.filename());
+        match migration.version {
+            Some(v) => info!("   Version: {}", v),
+            None => info!("   Type: Repeatable"),
+        }
+        info!("   File: {}", migration.file_path.display());
+        info!("   Lines: {}", migration.sql_content.lines().count());
+        info!("   Checksum: {}...", &migration.checksum[..8]);
 
         // Show SQL preview (first few lines)
         let sql_lines: Vec<&str> = migration.sql_content.lines().take(3).collect();
         if !sql_lines.is_empty() {
-            println!("   Preview:");
+            info!("   Preview:");
             for line in sql_lines {
                 if !line.trim().is_empty() {
-                    println!("     {}", line.chars().take(60).collect::<String>());
+                    info!("     {}", line.chars().take(60).collect::<String>());
                 }
             }
             if migration.sql_content.lines().count() > 3 {
-                println!("     ...");
+                info!("     ...");
             }
         }
-        println!();
+        info!("");
     }
 
-    println!("💡 Run with the 'apply' command to execute these migrations.");
-    println!("💡 Use '--dry-run' flag to see what would be executed without applying changes.");
+    info!("💡 Run with the 'apply' command to execute these migrations.");
+    info!("💡 Use '--dry-run' flag to see what would be executed without applying changes.");
 
     Ok(())
 }

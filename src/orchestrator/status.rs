@@ -14,7 +14,7 @@ pub fn run_status(conn: &str, path: &str) -> Result<(), StatusError> {
         .map_err(|e| StatusError::LoadFailed(e.to_string()))?;
 
     if migrations.is_empty() {
-        println!("📊 No migrations found in {}", path);
+        info!("📊 No migrations found in {}", path);
         return Ok(());
     }
 
@@ -25,7 +25,7 @@ pub fn run_status(conn: &str, path: &str) -> Result<(), StatusError> {
     if !sequence_issues.is_empty() {
         warn!("Migration sequence issues found:");
         for issue in &sequence_issues {
-            println!("⚠️  {}", issue);
+            warn!("⚠️  {}", issue);
         }
     }
 
@@ -33,13 +33,13 @@ pub fn run_status(conn: &str, path: &str) -> Result<(), StatusError> {
     let table_exists = schema_init::check_migration_table_exists(conn)?;
 
     if !table_exists {
-        println!("📊 Migration Status");
-        println!("==================");
-        println!("⚠️  schema_migrations table does not exist. Run 'init' command first.");
-        println!();
-        println!("Available migrations ({}): ", migrations.len());
+        info!("📊 Migration Status");
+        info!("==================");
+        warn!("⚠️  schema_migrations table does not exist. Run 'init' command first.");
+        info!("");
+        info!("Available migrations ({}): ", migrations.len());
         for migration in migrations {
-            println!("  📄 {} (PENDING)", migration.filename());
+            info!("  📄 {} (PENDING)", migration.filename());
         }
         return Ok(());
     }
@@ -47,38 +47,78 @@ pub fn run_status(conn: &str, path: &str) -> Result<(), StatusError> {
     // Get applied migrations
     let mut version_store = VersionStore::new(conn)?;
     let applied_migrations = version_store.get_applied_migrations()?;
-    let applied_versions: HashMap<u32, _> =
-        applied_migrations.iter().map(|m| (m.version, m)).collect();
+    let applied_map: HashMap<String, _> =
+        applied_migrations.iter().map(|m| (m.migration_id.clone(), m)).collect();
 
     // Display status
-    println!("📊 Migration Status");
-    println!("==================");
-    println!("Database: Connected ✅");
-    println!("Total migrations: {}", migrations.len());
-    println!("Applied: {}", applied_migrations.len());
-    println!("Pending: {}", migrations.len() - applied_migrations.len());
-    println!();
+    info!("📊 Migration Status");
+    info!("==================");
+    info!("Database: Connected ✅");
+    info!("Total migrations: {}", migrations.len());
+    info!("Applied: {}", applied_migrations.len());
+    info!("Pending: {}", migrations.len() - applied_migrations.len());
+    
+    // Show version statistics for versioned migrations
+    let applied_versions = version_store.get_applied_versions()?;
+    if !applied_versions.is_empty() {
+        info!("Latest applied version: {}", applied_versions.iter().max().unwrap());
+        debug!("Applied versions: {:?}", applied_versions);
+    }
+    info!("");
 
     // Show each migration status
     for migration in &migrations {
-        match applied_versions.get(&migration.version) {
+        match applied_map.get(&migration.identifier()) {
             Some(applied) => {
-                let status_icon = if applied.success { "✅" } else { "❌" };
-                println!(
-                    "  {} {} (applied: {}, {}ms)",
+                // Create a full Migration object with applied data for richer information
+                let migration_with_applied = crate::model::Migration::from_applied(
+                    applied, 
+                    migration.file_path.clone(), 
+                    migration.sql_content.clone()
+                );
+                
+                let status_icon = if migration_with_applied.is_applied() { "✅" } else { "❌" };
+                let migration_type_display = match applied.migration_type {
+                    crate::model::MigrationType::Versioned => "V",
+                    crate::model::MigrationType::Repeatable => "R",
+                };
+                
+                let timing_info = if let Some(exec_time) = migration_with_applied.execution_time() {
+                    format!("{}ms", exec_time)
+                } else {
+                    "unknown".to_string()
+                };
+                
+                info!(
+                    "  {} [{}] {} (applied: {}, {})", 
                     status_icon,
+                    migration_type_display,
                     migration.filename(),
                     applied.applied_at.format("%Y-%m-%d %H:%M:%S"),
-                    applied.execution_time_ms
+                    timing_info
                 );
+                
+                // Show file path for detailed info
+                debug!("      File: {}", migration.file_path.display());
+                
+                // Show applied timestamp if available  
+                if let Some(applied_time) = migration_with_applied.applied_timestamp() {
+                    debug!("      Applied at: {}", applied_time.format("%Y-%m-%d %H:%M:%S UTC"));
+                }
 
-                // Check for checksum mismatch
+                // Check for checksum mismatch using the applied migration data
                 if applied.checksum != migration.checksum {
-                    println!("      ⚠️  Checksum mismatch! File may have been modified after application.");
+                    warn!("      ⚠️  Checksum mismatch! File may have been modified after application.");
+                    debug!("         Stored: {}, Current: {}", applied.checksum, migration.checksum);
                 }
             }
             None => {
-                println!("  ⏳ {} (PENDING)", migration.filename());
+                let migration_type_display = match migration.migration_type {
+                    crate::model::MigrationType::Versioned => "V",
+                    crate::model::MigrationType::Repeatable => "R",
+                };
+                info!("  ⏳ [{}] {} (PENDING)", migration_type_display, migration.filename());
+                debug!("      File: {}", migration.file_path.display());
             }
         }
     }
@@ -87,13 +127,13 @@ pub fn run_status(conn: &str, path: &str) -> Result<(), StatusError> {
     let failed_migrations: Vec<_> = applied_migrations.iter().filter(|m| !m.success).collect();
 
     if !failed_migrations.is_empty() {
-        println!();
-        println!("❌ Failed Migrations:");
+        info!("");
+        warn!("❌ Failed Migrations:");
         for failed in failed_migrations {
-            println!(
+            warn!(
                 "  {} (version {}, failed at: {})",
                 failed.filename,
-                failed.version,
+                failed.version.map_or("R__".to_string(), |v| v.to_string()),
                 failed.applied_at.format("%Y-%m-%d %H:%M:%S")
             );
         }

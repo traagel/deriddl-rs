@@ -129,6 +129,28 @@ pub fn handle(cli: Cli) {
             orchestrator::run_health(final_path, final_dialect);
         }
 
+        Commands::Validate { conn, path } => {
+            info!("Running VALIDATE command");
+            let final_conn = conn
+                .or(config.database.connection_string)
+                .unwrap_or_else(|| {
+                    error!("No connection string provided via --conn flag or config file");
+                    std::process::exit(1);
+                });
+            let final_path = if path == "./migrations" {
+                &config.migrations.path
+            } else {
+                &path
+            };
+
+            debug!("Connection: {}", final_conn);
+            debug!("Migrations path: {}", final_path);
+            if let Err(e) = orchestrator::run_validate(&final_conn, final_path) {
+                error!("Validate command failed: {}", e);
+                std::process::exit(1);
+            }
+        }
+
         Commands::Config { output, env } => {
             info!("Running CONFIG command");
             debug!("Output path: {}", output);

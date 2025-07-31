@@ -134,6 +134,42 @@ pub fn handle(cli: Cli) {
             }
         }
 
+        Commands::Rollback { conn, path, steps, to_version, dry_run, force } => {
+            info!("Running ROLLBACK command");
+            let final_conn = conn
+                .or(config.database.connection_string)
+                .unwrap_or_else(|| {
+                    error!("No connection string provided via --conn flag or config file");
+                    std::process::exit(1);
+                });
+            let final_path = if path == "./migrations" {
+                &config.migrations.path
+            } else {
+                &path
+            };
+            let final_dry_run = dry_run || config.behavior.default_dry_run;
+            let require_confirmation = config.behavior.require_confirmation && !force;
+
+            debug!("Connection: {}", final_conn);
+            debug!("Migrations path: {}", final_path);
+            debug!("Steps: {}", steps);
+            debug!("To version: {:?}", to_version);
+            debug!("Dry run mode: {}", final_dry_run);
+            debug!("Force mode: {}", force);
+            
+            if let Err(e) = orchestrator::run_rollback(
+                &final_conn,
+                final_path,
+                steps,
+                to_version,
+                final_dry_run,
+                require_confirmation,
+            ) {
+                error!("Rollback command failed: {}", e);
+                std::process::exit(1);
+            }
+        }
+
         Commands::Baseline { conn, version, description, from_schema, dry_run } => {
             info!("Running BASELINE command");
             let final_conn = conn

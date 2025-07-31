@@ -89,6 +89,33 @@ pub enum Commands {
         path: String,
     },
 
+    /// Roll back applied migrations
+    Rollback {
+        /// ODBC connection string
+        #[arg(long)]
+        conn: Option<String>,
+
+        /// Path to .sql migration files
+        #[arg(long, default_value = "./migrations")]
+        path: String,
+
+        /// Number of migrations to roll back (default: 1)
+        #[arg(long, default_value = "1")]
+        steps: u32,
+
+        /// Roll back to specific migration version
+        #[arg(long, conflicts_with = "steps")]
+        to_version: Option<u32>,
+
+        /// Preview rollback without applying
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Skip confirmation prompt for destructive operations
+        #[arg(long)]
+        force: bool,
+    },
+
     /// Create baseline for existing database
     Baseline {
         /// ODBC connection string

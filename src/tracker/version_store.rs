@@ -406,6 +406,27 @@ impl VersionStore {
             }
         }
     }
+
+    /// Remove a migration record from the database (used for rollbacks)
+    pub fn remove_migration(&mut self, version: u32) -> Result<(), ConnectionError> {
+        debug!("Removing migration record for version {}", version);
+
+        let query = format!(
+            "DELETE FROM schema_migrations WHERE migration_type = 'versioned' AND version = {}",
+            version
+        );
+
+        let mut executor = self.get_executor()?;
+        executor.execute_query(&query)?;
+        
+        info!("Migration version {} removed from schema_migrations", version);
+        Ok(())
+    }
+
+    /// Get access to the database executor for direct SQL execution
+    pub fn executor(&mut self) -> Result<DatabaseExecutor, ConnectionError> {
+        self.get_executor()
+    }
 }
 
 fn parse_timestamp(timestamp_str: &str) -> DateTime<Utc> {

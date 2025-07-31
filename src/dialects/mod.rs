@@ -10,41 +10,36 @@ pub mod registry;
 pub mod postgres;
 pub mod mysql;
 pub mod sqlite;
+pub mod databricks;
 pub mod generic;
 
 // Re-export main types
-pub use base::{DatabaseDialect, DialectConfig, DetectionResult, DialectError};
-pub use registry::{DialectRegistry, get_registry};
+pub use base::{DatabaseDialect, DialectError};
+pub use registry::get_registry;
 
-/// Convenience function to detect dialect from connection string
-pub fn detect_dialect(connection_string: &str) -> Result<std::sync::Arc<dyn DatabaseDialect>, DialectError> {
-    let registry = get_registry().lock().unwrap();
-    registry.detect(connection_string)
-}
+// Re-export dialect-specific config types
+pub use databricks::{
+    DatabricksConfig, DatabricksOdbcConfig, DatabricksAuthConfig, DatabricksLoggingConfig,
+    DatabricksDriverConfig, DriverInfo, DriverVendor, DriverCapabilities
+};
 
-/// Convenience function to get dialect by name (or from config)
+/// Get dialect by name 
 pub fn get_dialect(name: &str) -> Option<std::sync::Arc<dyn DatabaseDialect>> {
     let registry = get_registry().lock().unwrap();
     registry.get(name)
 }
 
-/// Get dialect by name or detect from connection string, with config fallback
+/// Get dialect by name with config fallback (no auto-detection)
 pub fn get_dialect_with_config(
     explicit_name: Option<&str>, 
-    connection_string: Option<&str>,
+    _connection_string: Option<&str>,
     config_dialect: Option<&str>
 ) -> Result<std::sync::Arc<dyn DatabaseDialect>, DialectError> {
     let registry = get_registry().lock().unwrap();
     
-    // Priority: explicit name > connection string detection > config dialect > generic fallback
+    // Priority: explicit name > config dialect > generic fallback
     if let Some(name) = explicit_name {
         if let Some(dialect) = registry.get(name) {
-            return Ok(dialect);
-        }
-    }
-    
-    if let Some(conn_str) = connection_string {
-        if let Ok(dialect) = registry.detect(conn_str) {
             return Ok(dialect);
         }
     }

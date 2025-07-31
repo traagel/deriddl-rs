@@ -122,6 +122,7 @@ fn create_default_registry() -> DialectRegistry {
     registry.register(Arc::new(crate::dialects::postgres::PostgresDialect::new()));
     registry.register(Arc::new(crate::dialects::mysql::MysqlDialect::new()));
     registry.register(Arc::new(crate::dialects::sqlite::SqliteDialect::new()));
+    registry.register(Arc::new(crate::dialects::databricks::DatabricksDialect::new()));
     registry.register(Arc::new(crate::dialects::generic::GenericDialect::new()));
     
     registry

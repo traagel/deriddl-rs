@@ -1,0 +1,48 @@
+[metadata]
+name = "Databricks"
+version = "1.0.0"
+aliases = ["databricks", "spark", "delta"]
+description = "Databricks/Apache Spark SQL database dialect support"
+min_version = "7.0"
+max_version = "14.x"
+
+[detection]
+connection_patterns = [
+    ".*databricks.*",
+    ".*spark.*",
+    ".*delta.*",
+    "jdbc:spark://.*",
+    "jdbc:databricks://.*"
+]
+driver_patterns = [
+    "Simba.*Spark.*ODBC.*",
+    "Databricks.*ODBC.*",
+    "Apache.*Spark.*ODBC.*",
+    ".*SparkODBC.*",
+    ".*DatabricksODBC.*"
+]
+
+[features]
+supports_transactions = false
+supports_savepoints = false
+supports_schemas = true
+supports_sequences = false
+supports_arrays = true
+case_sensitive = false
+
+[sql]
+quote_identifier = "`"
+escape_identifier = "``"
+current_timestamp = "CURRENT_TIMESTAMP()"
+boolean_true = "TRUE"
+boolean_false = "FALSE"
+
+[types]
+migration_id = "STRING"
+migration_type = "STRING"
+version = "INT"
+filename = "STRING"
+checksum = "STRING"
+applied_at = "TIMESTAMP"
+execution_time_ms = "BIGINT"
+success = "BOOLEAN"

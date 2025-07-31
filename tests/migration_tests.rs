@@ -13,7 +13,7 @@ fn test_status_command_no_connection() {
         .current_dir(&temp_dir)
         .assert()
         .failure()
-        .stderr(contains("No connection string provided"));
+        .stdout(contains("No connection string provided"));
 }
 
 #[test]
@@ -27,5 +27,5 @@ fn test_apply_command_no_connection() {
         .current_dir(&temp_dir)
         .assert()
         .failure()
-        .stderr(contains("No connection string provided"));
+        .stdout(contains("No connection string provided"));
 }

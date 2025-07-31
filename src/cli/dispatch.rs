@@ -1,7 +1,6 @@
 use crate::cli::args::{Cli, Commands};
 use crate::model::Config;
 use crate::orchestrator;
-use crate::tracker::schema_init;
 use log::{debug, error, info};
 
 pub fn handle(cli: Cli) {

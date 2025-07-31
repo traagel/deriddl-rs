@@ -19,6 +19,7 @@ pub struct Migration {
     pub name: String,
     pub file_path: PathBuf,
     pub sql_content: String,
+    pub rollback_sql: Option<String>, // SQL for rolling back this migration
     pub checksum: String,
     pub applied_at: Option<DateTime<Utc>>,
     pub execution_time_ms: Option<u32>,
@@ -28,14 +29,16 @@ pub struct Migration {
 impl Migration {
     /// Constructs a new versioned `Migration` with computed checksum and default metadata.
     pub fn new(version: u32, name: String, file_path: PathBuf, sql_content: String) -> Self {
-        let checksum = Self::compute_checksum(&sql_content);
+        let (up_sql, down_sql) = Self::parse_migration_content(&sql_content);
+        let checksum = Self::compute_checksum(&up_sql);
 
         Self {
             migration_type: MigrationType::Versioned,
             version: Some(version),
             name,
             file_path,
-            sql_content,
+            sql_content: up_sql,
+            rollback_sql: down_sql,
             checksum,
             applied_at: None,
             execution_time_ms: None,
@@ -50,12 +53,15 @@ impl Migration {
         file_path: PathBuf,
         sql_content: String,
     ) -> Self {
+        let (up_sql, down_sql) = Self::parse_migration_content(&sql_content);
+        
         Self {
             migration_type: applied.migration_type.clone(),
             version: applied.version,
             name: extract_name_from_filename(&applied.filename),
             file_path,
-            sql_content,
+            sql_content: up_sql,
+            rollback_sql: down_sql,
             checksum: applied.checksum.clone(),
             applied_at: Some(applied.applied_at),
             execution_time_ms: Some(applied.execution_time_ms as u32),
@@ -80,14 +86,16 @@ impl Migration {
     
     /// Constructs a new repeatable `Migration` with computed checksum and default metadata.
     pub fn new_repeatable(name: String, file_path: PathBuf, sql_content: String) -> Self {
-        let checksum = Self::compute_checksum(&sql_content);
+        let (up_sql, down_sql) = Self::parse_migration_content(&sql_content);
+        let checksum = Self::compute_checksum(&up_sql);
 
         Self {
             migration_type: MigrationType::Repeatable,
             version: None,
             name,
             file_path,
-            sql_content,
+            sql_content: up_sql,
+            rollback_sql: down_sql,
             checksum,
             applied_at: None,
             execution_time_ms: None,
@@ -120,6 +128,62 @@ impl Migration {
     /// Returns true if this migration is repeatable.
     pub fn is_repeatable(&self) -> bool {
         self.migration_type == MigrationType::Repeatable
+    }
+
+    /// Parses migration content to separate up/down SQL sections
+    /// Supports two formats:
+    /// 1. Separator-based: -- +migrate Up / -- +migrate Down
+    /// 2. Section-based: -- UP / -- DOWN
+    fn parse_migration_content(content: &str) -> (String, Option<String>) {
+        let content = content.trim();
+        
+        // Try different separator patterns
+        let separators = [
+            ("-- +migrate Up", "-- +migrate Down"),
+            ("-- UP", "-- DOWN"),
+            ("-- +goose Up", "-- +goose Down"), // Compatible with goose migrations
+            ("-- @@UP@@", "-- @@DOWN@@"),
+        ];
+        
+        for (up_marker, down_marker) in &separators {
+            if let Some((up_sql, down_sql)) = Self::split_by_markers(content, up_marker, down_marker) {
+                return (up_sql.trim().to_string(), Some(down_sql.trim().to_string()));
+            }
+        }
+        
+        // If no separators found, treat entire content as up migration
+        (content.to_string(), None)
+    }
+    
+    /// Helper function to split content by up/down markers
+    fn split_by_markers(content: &str, up_marker: &str, down_marker: &str) -> Option<(String, String)> {
+        // Find the up marker (case insensitive)
+        let up_pos = content.to_lowercase().find(&up_marker.to_lowercase())?;
+        
+        // Find the down marker after the up marker
+        let search_start = up_pos + up_marker.len();
+        let remaining_content = &content[search_start..];
+        let down_pos = remaining_content.to_lowercase().find(&down_marker.to_lowercase())?;
+        
+        // Extract up SQL (everything after up marker until down marker)
+        let up_end = search_start + down_pos;
+        let up_sql = &content[up_pos + up_marker.len()..up_end];
+        
+        // Extract down SQL (everything after down marker)
+        let down_start = search_start + down_pos + down_marker.len();
+        let down_sql = &content[down_start..];
+        
+        Some((up_sql.to_string(), down_sql.to_string()))
+    }
+    
+    /// Returns true if this migration has rollback SQL available
+    pub fn has_rollback(&self) -> bool {
+        self.rollback_sql.is_some() && !self.rollback_sql.as_ref().unwrap().trim().is_empty()
+    }
+    
+    /// Gets the rollback SQL for this migration
+    pub fn get_rollback_sql(&self) -> Option<&str> {
+        self.rollback_sql.as_deref()
     }
 
     /// Computes a stable checksum based on the SQL content.

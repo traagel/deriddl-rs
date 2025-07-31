@@ -1,6 +1,7 @@
 pub mod apply;
 pub mod baseline;
 pub mod plan;
+pub mod rollback;
 pub mod status;
 pub mod validate;
 pub mod planner;
@@ -11,6 +12,7 @@ pub mod health;
 pub use apply::run_apply;
 pub use baseline::run_baseline;
 pub use plan::run_plan;
+pub use rollback::run_rollback;
 pub use status::run_status;
 pub use validate::run_validate;
 pub use migration_loader::MigrationLoader;
